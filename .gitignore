@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Local runtime data (generated at runtime; not part of the package)
+assets/events/
+assets/sessions/
+assets/overrides.json

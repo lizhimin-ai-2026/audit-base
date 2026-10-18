@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "skill": "audit-base",
+  "description": "Operation Audit Base rule set: 16-column contract / quarterly rotation / archive retention / bilingual daily & weekly reports / ingest markers / anomaly thresholds / storage path (all computable, no hardcoding)",
+  "event_columns": [
+    "ts", "source", "event_type", "actor", "action", "target", "result",
+    "severity", "rule_id", "evidence_hash", "ref_id", "human_decision",
+    "undo_ref", "note", "status", "schema_version"
+  ],
+  "rotation": {
+    "period": "quarterly",
+    "archive_months": 12,
+    "configurable": true
+  },
+  "storage": {
+    "base_dir": "",
+    "default": "%LOCALAPPDATA%\\AuditBase\\audit",
+    "subdirs": ["events", "reports", "archive", ".undo"],
+    "note": "empty base_dir = use the LOCALAPPDATA default; --base-dir overrides; during development you may fall back to the in-package assets/; use the migrate subcommand to move legacy data (copy, source kept)"
+  },
+  "ingest_markers": {
+    "required_fields": ["ts", "source", "event_type", "actor", "action", "target", "result", "severity", "rule_id", "evidence_hash", "status"],
+    "conflict_window_seconds": 60,
+    "rules": {
+      "incomplete": {"severity": "WARN", "rule_id": "incomplete-event", "action": "mark-not-write", "desc": "missing required fields -> mark incomplete, original event NOT written, log a WARN"},
+      "unverified_source": {"severity": "WARN", "rule_id": "unverified-source", "action": "mark-and-write", "desc": "unrecognized source -> mark unverified_source, log a WARN, original event still written"},
+      "conflict": {"severity": "CRIT", "rule_id": "conflict-event", "action": "mark-and-write", "desc": "DENY but an ALLOW for the same actor+target exists within the window -> mark conflict, log a CRIT, original event still written"}
+    }
+  },
+  "anomaly_rules": {
+    "crit_severity": "CRIT",
+    "repeated_deny_threshold": 3,
+    "repeated_deny_event_types": ["access.deny", "deploy.deny"],
+    "hold_decisions": ["hold"],
+    "hold_timeout_hours": 24
+  },
+  "weekly_report": {
+    "languages": ["zh", "en"],
+    "sections": ["summary", "anomalies", "open-holds", "overrides"],
+    "exception_top_n": 10
+  },
+  "daily_report": {
+    "languages": ["zh", "en"],
+    "sections": ["summary", "anomalies", "open-holds"]
+  },
+  "alerts": {
+    "format": "json",
+    "fields": "16-column contract + anomaly_type",
+    "redaction": "evidence_hash fingerprint only; zero sensitive values on disk"
+  },
+  "undo": {
+    "enabled": true,
+    "backup_dir": ".undo",
+    "keep_last": 3,
+    "applies_to": ["rotate archiving", "manual cleanup deletion"],
+    "verify": "compare sha256 in manifest on restore"
+  },
+  "redaction_policy": "evidence_hash stores fingerprints only (first 16 chars of SHA256); responses containing sensitive fields record field names only; verbatim exception quotes go to the note column only",
+  "append_only": true,
+  "ingest_sources": {
+    "gatekeeper": ["access.allow", "access.deny"],
+    "secret-guardian": ["secret.found", "secret.blocked", "secret.alerted"],
+    "deploy-contract": ["deploy.allow", "deploy.deny", "deploy.override"],
+    "compliance": ["content.pass", "content.block"],
+    "cross-border": ["compliance.check", "compliance.risk"]
+  }
+}
